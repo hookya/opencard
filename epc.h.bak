@@ -1,0 +1,47 @@
+#ifndef EPC_H
+#define EPC_H
+
+#include <QSerialPort>
+#include <QDebug>
+#include <string>
+#include "common.h"
+#include <QByteArray>
+#include <QThread>
+#include <QMutex>
+#include <QWaitCondition>
+
+#define PRESET_VALUE  0xFFFF
+#define PLOY_NORMAL   0x8480
+#define ADR           0xFF
+#define READ_EPC      0x01
+#define WRITE_EPC     0x04
+#define COM_LEN       4
+#define RESP_COM_LEN  5
+#define NUM_BYTE_LEN  4
+
+class Epc : public QThread
+{
+    Q_OBJECT
+public:
+    void run() override;
+    explicit Epc(QObject *parent = nullptr);
+    bool OpenEpc(qint32 baud,QSerialPort::Parity parity,QString &portName,QSerialPort::StopBits stopBits);
+    bool isOpen();
+    int WriteEpc(const char *number);
+    int ReadEpc();
+    ~Epc();
+signals:
+
+
+private:
+    QSerialPort *handler;
+    int HandlerData(QByteArray *bytes,char cmd,char *data,int size);
+    void CRC16(QByteArray *bytes);
+    QByteArray SendData(QByteArray *bytes);
+    int m_waitTimeout = 0;
+    QMutex m_mutex;
+    QWaitCondition m_cond;
+    bool m_quit = false;
+};
+
+#endif // EPC_H

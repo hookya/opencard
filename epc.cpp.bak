@@ -1,0 +1,121 @@
+#include "epc.h"
+
+Epc::Epc(QObject *parent) :
+    QThread(parent)
+{
+//    this->handler = handler;
+}
+
+Epc::~Epc() {
+
+    m_mutex.lock();
+    m_quit = true;
+    m_cond.wakeOne();
+    m_mutex.unlock();
+    wait();
+}
+
+int Epc::WriteEpc(const char * number) {
+    if (this->handler == nullptr && strlen(number) == 0) {
+        return 0;
+    }
+    qDebug() << "WriteEpc Number" << number;
+    int len = strlen(number);
+    if (len %2 && ((len / 2) != 4)) {
+        return 0;
+    }
+    char nums[NUM_BYTE_LEN] = {0};
+    Common::HexStringToByte(number,nums,NUM_BYTE_LEN);
+    QByteArray *bytes = new QByteArray();
+    HandlerData(bytes,WRITE_EPC,nums,4);
+
+    // 添加长度
+    // this->handler->write();
+    return 0;
+}
+
+int Epc::ReadEpc() {
+    if (this->handler == nullptr) {
+        return 0;
+    }
+    return 0;
+}
+
+/**
+ * 组合数据
+ * @brief Epc::HandlerData
+ * @param bytes
+ * @param data
+ * @param size
+ */
+int Epc::HandlerData(QByteArray *bytes,char cmd,char *data,int size){
+    char len = COM_LEN + size;
+    // 长度
+    bytes->append(len);
+    // 地址
+    bytes->append(ADR);
+    // 命令
+    bytes->append(cmd);
+    // 数据
+    bytes->append(data);
+    // crc16 校验码
+    return bytes->size();
+}
+
+void Epc::CRC16(QByteArray *bytes){
+    unsigned short value = PRESET_VALUE;
+    for(int i = 0; i< bytes->size(); i++) {
+        value = value ^ bytes->at(i);
+        for(int j = 0; j < 8; j++) {
+            if (value & 0x0001)
+                value = (value>>1)^PLOY_NORMAL;
+            else
+                value = value>>1;
+        }
+    }
+    bytes->append((char)value&0xFF);
+    bytes->append((char)value>>4);
+}
+
+QByteArray Epc::SendData(QByteArray *bytes) {
+    int hexLen = bytes->size();
+    int tLen = 0;
+//    while (sendLen = this->handler->write(bytes->data())) {
+
+//    }
+    do {
+        int n = this->handler->write(bytes->data());
+        tLen+=n;
+        if (tLen>=hexLen)
+            break;
+    } while (1);
+    tLen = 0;
+    QByteArray res;
+    while(true) {
+        res = this->handler->readAll();
+        if (res.size()>0) {
+            int len = res[0];
+            if (res.size() >= len) {
+                break;
+            }
+        }
+        break;
+    }
+    return res;
+}
+
+void Epc::run() {
+
+}
+
+bool Epc::OpenEpc(qint32 baud,QSerialPort::Parity parity,QString &portName,QSerialPort::StopBits stopBits) {
+    handler->setBaudRate(baud);
+    handler->setParity(parity);
+    handler->setPortName(portName);
+    handler->setStopBits(stopBits);
+    return handler->open(QSerialPort::ReadWrite);
+}
+bool Epc::isOpen() {
+    return this->handler->isOpen();
+}
+
